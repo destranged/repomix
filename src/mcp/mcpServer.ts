@@ -1,3 +1,4 @@
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { getVersion } from '../core/file/packageJsonParse.js';
@@ -8,6 +9,9 @@ import { registerFileSystemReadFileTool } from './tools/fileSystemReadFileTool.j
 import { registerPackCodebaseTool } from './tools/packCodebaseTool.js';
 import { registerPackRemoteRepositoryTool } from './tools/packRemoteRepositoryTool.js';
 import { registerReadRepomixOutputTool } from './tools/readRepomixOutputTool.js';
+
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import express from "express";
 
 export const createMcpServer = async () => {
   const mcpServer = new McpServer({
@@ -35,7 +39,7 @@ type Dependencies = {
 const defaultDependencies: Dependencies = {
   processExit: process.exit,
 };
-
+/*
 export const runMcpServer = async (deps: Dependencies = defaultDependencies) => {
   const server = await createMcpServer();
   const transport = new StdioServerTransport();
@@ -62,4 +66,27 @@ export const runMcpServer = async (deps: Dependencies = defaultDependencies) => 
     logger.error('Failed to start MCP server:', error);
     processExit(1);
   }
+};
+*/
+export const runMcpServer = async (deps: Dependencies = defaultDependencies) => {
+
+  const app = express();
+  const server = await createMcpServer();
+  let transport: SSEServerTransport | null = null;
+
+  app.get("/sse", (req, res) => {
+    transport = new SSEServerTransport("/messages", res);
+    server.connect(transport);
+  });
+
+  app.post("/messages", (req, res) => {
+    if (transport) {
+      transport.handlePostMessage(req, res);
+    }
+  });
+
+  app.listen(3000, () => {
+    console.error("Repomix MCP Server running on sse");
+  });
+
 };
